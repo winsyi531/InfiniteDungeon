@@ -1,1 +1,92 @@
+body {
+    background-color: #1a1a1a;
+    color: white;
+    font-family: 'Courier New', Courier, monospace;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
 
+#game-container {
+    width: 400px;
+    height: 500px;
+    border: 4px solid #fff;
+    position: relative;
+    background: #222;
+    overflow: hidden;
+}
+
+/* 數值看板 */
+#stats-panel {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    border: 2px solid #aaa;
+    padding: 10px;
+    background: rgba(0,0,0,0.5);
+    width: 120px;
+}
+
+/* 進度條 */
+#progress-panel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    text-align: right;
+}
+
+.dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background: #555;
+    border-radius: 50%;
+    margin-left: 5px;
+}
+.dot.active { background: #0f0; }
+
+/* 卡牌樣式 */
+#event-layer {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    width: 100%;
+    z-index: 10;
+}
+
+.card-container { display: flex; justify-content: center; gap: 20px; }
+.card {
+    width: 100px;
+    padding: 10px;
+    border: 2px solid gold;
+    cursor: pointer;
+    background: #333;
+}
+.card:hover { background: #444; }
+
+/* 戰鬥畫面 */
+#battle-area {
+    position: absolute;
+    bottom: 50px;
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.entity { font-size: 50px; }
+#player-hp-bar {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 10px;
+    background: #555;
+}
+#hp-fill { width: 100%; height: 100%; background: #f00; transition: width 0.3s; }
+.hidden { display: none; }
