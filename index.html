@@ -1,1 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Dungeon Crawler</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="stats-panel">
+            <div class="stat-row"><span>ATK:</span> <span id="atk">10</span></div>
+            <div class="stat-row"><span>DEF:</span> <span id="def">5</span></div>
+            <div class="stat-row"><span>CRI:</span> <span id="cri">5</span>%</div>
+            <div class="stat-row"><span>DOD:</span> <span id="dod">5</span>%</div>
+        </div>
 
+        <div id="progress-panel">
+            <div id="stages">
+                <span class="dot active"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="boss-icon">💀</span>
+            </div>
+            <div id="level-display">Level: 1</div>
+        </div>
+
+        <div id="event-layer" class="hidden">
+            <h3>選擇你的成長</h3>
+            <div class="card-container">
+                <div class="card" onclick="chooseEvent('atk')">
+                    <h4>磨刀石</h4>
+                    <p>ATK +2</p>
+                </div>
+                <div class="card" onclick="chooseEvent('def')">
+                    <h4>厚皮甲</h4>
+                    <p>DEF +2</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="battle-area">
+            <div id="player" class="entity">👤</div>
+            <div id="battle-log">準備出發...</div>
+            <div id="enemy" class="entity">👺</div>
+        </div>
+        
+        <div id="player-hp-bar"><div id="hp-fill"></div></div>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>
