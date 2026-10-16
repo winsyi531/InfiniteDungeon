@@ -1,52 +1,73 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Dungeon Crawler</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>無限地城 Infinite Dungeon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="game-container">
-        <div id="stats-panel">
-            <div class="stat-row"><span>ATK:</span> <span id="atk">10</span></div>
-            <div class="stat-row"><span>DEF:</span> <span id="def">5</span></div>
-            <div class="stat-row"><span>CRI:</span> <span id="cri">5</span>%</div>
-            <div class="stat-row"><span>DOD:</span> <span id="dod">5</span>%</div>
-        </div>
+  <div id="app">
+    <!-- 頂部：樓層 / 進度 / 設定 -->
+    <header id="topbar" class="px-box">
+      <div id="floor-badge"><span class="lbl">FLOOR</span><span id="floor-num" class="num">1</span></div>
+      <ol id="track"></ol>
+      <div id="controls">
+        <button id="btn-speed" class="px-btn small" title="戰鬥速度 (S)">x1</button>
+        <button id="btn-sound" class="px-btn small" title="音效 (M)">♪</button>
+      </div>
+    </header>
 
-        <div id="progress-panel">
-            <div id="stages">
-                <span class="dot active"></span>
-                <span class="dot"></span>
-                <span class="dot"></span>
-                <span class="boss-icon">💀</span>
-            </div>
-            <div id="level-display">Level: 1</div>
-        </div>
+    <!-- 數值 -->
+    <section id="stats" class="px-box">
+      <div class="stat" data-k="atk"><i class="icon" data-icon="atk"></i><span class="k">攻擊</span><b id="s-atk">0</b></div>
+      <div class="stat" data-k="def"><i class="icon" data-icon="def"></i><span class="k">防禦</span><b id="s-def">0</b></div>
+      <div class="stat" data-k="cri"><i class="icon" data-icon="cri"></i><span class="k">爆擊</span><b id="s-cri">0%</b></div>
+      <div class="stat" data-k="dod"><i class="icon" data-icon="dod"></i><span class="k">閃避</span><b id="s-dod">0%</b></div>
+      <div id="perks"></div>
+    </section>
 
-        <div id="event-layer" class="hidden">
-            <h3>選擇你的成長</h3>
-            <div class="card-container">
-                <div class="card" onclick="chooseEvent('atk')">
-                    <h4>磨刀石</h4>
-                    <p>ATK +2</p>
-                </div>
-                <div class="card" onclick="chooseEvent('def')">
-                    <h4>厚皮甲</h4>
-                    <p>DEF +2</p>
-                </div>
-            </div>
-        </div>
+    <!-- 戰鬥場景 -->
+    <section id="scene">
+      <canvas id="bg" width="160" height="100"></canvas>
+      <div id="foe-plate" class="plate hidden">
+        <div class="plate-head"><span id="foe-name">—</span><span id="foe-tag" class="tag"></span></div>
+        <div class="bar foe"><div id="foe-hp-lag" class="lag"></div><div id="foe-hp" class="fill"></div><span id="foe-hp-text" class="bar-text"></span></div>
+        <div id="foe-status" class="status-row"></div>
+      </div>
+      <div id="stage">
+        <div id="hero" class="fighter"><div class="sprite-wrap"></div><div class="shadow"></div></div>
+        <div id="foe" class="fighter hidden"><div class="sprite-wrap"></div><div class="shadow"></div></div>
+        <div id="camp" class="hidden"><div class="sprite-wrap"></div></div>
+      </div>
+      <div id="fx"></div>
+      <div id="banner" class="hidden"></div>
+    </section>
 
-        <div id="battle-area">
-            <div id="player" class="entity">👤</div>
-            <div id="battle-log">準備出發...</div>
-            <div id="enemy" class="entity">👺</div>
-        </div>
-        
-        <div id="player-hp-bar"><div id="hp-fill"></div></div>
+    <!-- 主角血條 -->
+    <section id="hero-panel" class="px-box">
+      <div class="hp-line">
+        <i class="icon" data-icon="hp"></i>
+        <div class="bar hero"><div id="hero-hp-lag" class="lag"></div><div id="hero-hp" class="fill"></div><span id="hero-hp-text" class="bar-text"></span></div>
+      </div>
+      <div id="hero-status" class="status-row"></div>
+    </section>
+
+    <!-- 戰鬥紀錄 -->
+    <section id="log" class="px-box"></section>
+
+    <!-- 覆蓋層：開始 / 選卡 / 結束 -->
+    <div id="overlay" class="hidden">
+      <div id="modal" class="px-box"></div>
     </div>
-    <script src="main.js"></script>
+  </div>
+
+  <script src="src/sprites.js"></script>
+  <script src="src/cards.js"></script>
+  <script src="src/engine.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
