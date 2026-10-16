@@ -30,24 +30,51 @@ const ENEMY_TYPES = {
               trait: 'pierce', tag: '穿透・虛體' },
 };
 
-const BOSS_NAMES = ['毛帽大王', '毛帽大王・怒', '毛帽皇帝', '永夜毛帽'];
+// 十隻神獸首領。血量過半會「覺醒變形」：換上新外型，並獲得各自的能力
+const BOSSES = {
+  dragon:   { name: '赤焰龍', awakeName: '煉獄・赤焰龍',   skill: '龍息',     power: '重擊附帶灼燒',
+              awaken: e => { e.atk *= 1.3; e.smashBurn = true; } },
+  phoenix:  { name: '鳳凰',   awakeName: '涅槃・冰焰鳳凰', skill: '涅槃之火', power: '覺醒時回復 15% 生命',
+              awaken: e => { e.atk *= 1.15; e.hp = Math.min(e.maxHp, e.hp + e.maxHp * .15); } },
+  tiger:    { name: '白虎',   awakeName: '雷霆・白虎',     skill: '迅雷爪',   power: '30% 機率連擊',
+              awaken: e => { e.atk *= 1.2; e.double = 30; } },
+  tortoise: { name: '玄武',   awakeName: '深淵・玄武',     skill: '鐵甲衝撞', power: '防禦大幅提升', hp: 1.1,
+              awaken: e => { e.atk *= 1.15; e.def *= 1.7; } },
+  fox:      { name: '九尾狐', awakeName: '妖月・九尾',     skill: '狐火',     power: '閃避 +20%',
+              awaken: e => { e.atk *= 1.25; e.dod += 20; } },
+  qilin:    { name: '麒麟',   awakeName: '聖焰・麒麟',     skill: '天雷',     power: '每回合再生 3%',
+              awaken: e => { e.atk *= 1.15; e.regen = 3; } },
+  azure:    { name: '青龍',   awakeName: '蒼穹・青龍',     skill: '龍捲風暴', power: '每 3 回合重擊一次',
+              awaken: e => { e.atk *= 1.25; e.smashEvery = 3; } },
+  hydra:    { name: '九頭蛇', awakeName: '劇毒・九頭蛇',   skill: '毒牙齊咬', power: '攻擊 40% 機率中毒',
+              awaken: e => { e.atk *= 1.2; e.poisonChance = 40; } },
+  griffin:  { name: '獅鷲',   awakeName: '風暴・獅鷲',     skill: '俯衝',     power: '爆擊率 35%',
+              awaken: e => { e.atk *= 1.25; e.cri = 35; } },
+  kraken:   { name: '克拉肯', awakeName: '深淵・克拉肯',   skill: '纏繞',     power: '攻擊吸血 25%',
+              awaken: e => { e.atk *= 1.15; e.leech = 25; } },
+};
 
 function floorScale(floor) {
   // 前期線性成長、後期緩慢指數，確保「無限」地城終究會打倒你
   return (1 + .3 * (floor - 1)) * Math.pow(1.14, floor - 1);
 }
 
-function createEnemy(floor, node) {
+// 一般怪物的特性轉成數值欄位，戰鬥邏輯只看這些欄位
+const TRAIT_FIELDS = {
+  regen: { regen: 5 }, leech: { leech: 50 }, poison: { poisonChance: 45 }, pierce: { pierce: true },
+};
+
+function createEnemy(floor, node, bossKey) {
   const s = floorScale(floor) * (node === 1 ? 1.08 : 1);
+  const base = { turn: 0, regen: 0, leech: 0, poisonChance: 0, double: 0, pierce: false, smashEvery: 0 };
   if (FLOOR_NODES[node] === 'boss') {
-    const tier = Math.floor((floor - 1) / 3);
+    const key = bossKey || Object.keys(BOSSES)[Math.floor(Math.random() * 10)];
+    const b = BOSSES[key];
     return {
-      boss: true, sprite: 'boss',
-      name: BOSS_NAMES[Math.min(tier, BOSS_NAMES.length - 1)],
-      tag: '狂暴・重擊',
-      hue: (tier * 70) % 360,
-      maxHp: Math.round(38 * 2.1 * s), atk: Math.round(8 * 1.05 * s), def: Math.round(3 * 1.4 * s),
-      cri: 10, dod: 5, trait: 'boss', enraged: false, turn: 0,
+      ...base, boss: true, key, sprite: 'boss_' + key,
+      name: b.name, tag: `${b.skill}・會覺醒`,
+      maxHp: Math.round(38 * 2.1 * s * (b.hp || 1)), atk: Math.round(8 * 1.05 * s), def: Math.round(3 * 1.4 * s),
+      cri: 10, dod: 5, awake: false, smashEvery: 4,
     };
   }
   const types = Object.entries(ENEMY_TYPES).filter(([, t]) => floor >= t.minFloor);
@@ -55,12 +82,13 @@ function createEnemy(floor, node) {
   const elite = floor >= 3 && Math.random() < Math.min(.4, .06 + floor * .03);
   const em = elite ? { hp: 1.5, atk: 1.25 } : { hp: 1, atk: 1 };
   return {
+    ...base, ...(TRAIT_FIELDS[t.trait] || {}),
     boss: false, elite, sprite: t.sprite,
     name: (elite ? '菁英・' : '') + t.name, tag: t.tag,
     maxHp: Math.round(38 * t.hp * em.hp * s),
     atk: Math.round(8 * t.atk * em.atk * s),
     def: Math.round(3 * t.def * s),
-    cri: 5, dod: t.dod, trait: t.trait, turn: 0,
+    cri: 5, dod: t.dod,
   };
 }
 
@@ -92,10 +120,15 @@ function* battle(p, e) {
     }
     if (e.hp <= 0) { yield { type: 'win' }; return 'win'; }
 
-    if (e.boss && !e.enraged && e.hp < e.maxHp / 2) {
-      e.enraged = true;
-      e.atk = Math.round(e.atk * 1.3);
-      yield { type: 'enrage' };
+    if (e.boss && !e.awake && e.hp < e.maxHp / 2) {
+      const b = BOSSES[e.key];
+      const before = e.hp;
+      e.awake = true;
+      b.awaken(e);
+      e.atk = Math.round(e.atk); e.def = Math.round(e.def); e.hp = Math.round(e.hp);
+      e.name = b.awakeName; e.sprite = 'boss_' + e.key + '_2';
+      e.tag = b.power;
+      yield { type: 'transform', heal: e.hp - before, power: b.power };
     }
 
     // ---- 敵人回合 ----
@@ -108,19 +141,20 @@ function* battle(p, e) {
       if (p.hp <= 0) { const r = yield* tryRevive(p); if (!r) return 'lose'; }
     }
 
-    const smash = e.boss && e.turn % 4 === 0;
-    if (e.boss && e.turn % 4 === 3) yield { type: 'charge' };
+    const smash = e.boss && e.turn % e.smashEvery === 0;
+    if (e.boss && e.turn % e.smashEvery === e.smashEvery - 1) yield { type: 'charge', skill: BOSSES[e.key].skill };
 
-    if (!smash && chance(p.dod)) {
-      yield { type: 'miss', who: 'enemy' };
-    } else {
+    const foeSwings = smash ? 1 : chance(e.double) ? 2 : 1;
+    for (let i = 0; i < foeSwings; i++) {
+      if (!smash && chance(p.dod)) { yield { type: 'miss', who: 'enemy' }; continue; }
       const crit = !smash && chance(e.cri);
-      const def = e.trait === 'pierce' ? p.def / 2 : p.def;
-      const dmg = calcDamage(e.atk, def, smash ? 2 : crit ? 1.5 : 1);
+      const dmg = calcDamage(e.atk, e.pierce ? p.def / 2 : p.def, smash ? 2 : crit ? 1.5 : 1);
       p.hp = Math.max(0, p.hp - dmg);
-      const ev = { type: 'hit', who: 'enemy', dmg, crit, smash };
-      if (e.trait === 'leech') { const h = Math.round(dmg * .5); e.hp = Math.min(e.maxHp, e.hp + h); ev.heal = h; }
-      if (e.trait === 'poison' && chance(45)) { p.poison = 3; ev.poisoned = true; }
+      const ev = { type: 'hit', who: 'enemy', dmg, crit, smash, extra: i > 0, skill: smash ? BOSSES[e.key].skill : null };
+      if (e.leech) { const h = Math.min(e.maxHp - e.hp, Math.round(dmg * e.leech / 100)); if (h > 0) { e.hp += h; ev.heal = h; } }
+      if ((smash && e.smashBurn) || (e.poisonChance && chance(e.poisonChance))) {
+        p.poison = 3; ev.poisoned = true; ev.burn = smash && e.smashBurn;
+      }
       yield ev;
       if (p.thorn && p.hp > 0) {
         const td = Math.max(1, Math.round(dmg * p.thorn / 100));
@@ -131,8 +165,8 @@ function* battle(p, e) {
       if (p.hp <= 0) { const r = yield* tryRevive(p); if (!r) return 'lose'; }
     }
 
-    if (e.trait === 'regen' && e.hp < e.maxHp) {
-      const h = Math.min(e.maxHp - e.hp, Math.round(e.maxHp * .05));
+    if (e.regen && e.hp < e.maxHp) {
+      const h = Math.min(e.maxHp - e.hp, Math.round(e.maxHp * e.regen / 100));
       e.hp += h;
       yield { type: 'regen', heal: h };
     }
@@ -153,5 +187,5 @@ function* tryRevive(p) {
 
 // 給 node 跑平衡模擬用
 if (typeof module !== 'undefined') {
-  module.exports = { createPlayer, createEnemy, battle, floorScale, FLOOR_NODES, ENEMY_TYPES };
+  module.exports = { createPlayer, createEnemy, battle, floorScale, FLOOR_NODES, ENEMY_TYPES, BOSSES };
 }

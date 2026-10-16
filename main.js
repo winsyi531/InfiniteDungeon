@@ -177,8 +177,8 @@ function renderFoe() {
   const e = currentFoe; if (!e) return;
   setBar('foe', e.hp, e.maxHp);
   const st = [];
-  if (e.enraged) st.push('<span class="st-enrage">狂暴</span>');
-  if (e.boss) st.push(`<span class="st-charge">重擊倒數 ${4 - (e.turn % 4)}</span>`);
+  if (e.awake) st.push('<span class="st-enrage">覺醒</span>');
+  if (e.boss) st.push(`<span class="st-charge">${BOSSES[e.key].skill}倒數 ${e.smashEvery - (e.turn % e.smashEvery)}</span>`);
   $('foe-status').innerHTML = st.join('');
 }
 
@@ -207,7 +207,7 @@ function shake(big) { retrigger($('scene'), big ? 'shake-big' : 'shake'); }
 
 function floatText(target, text, cls) {
   const scene = $('scene').getBoundingClientRect();
-  const r = $(target).querySelector('canvas').getBoundingClientRect();
+  const r = $(target).querySelector('canvas:not(.off)').getBoundingClientRect();
   const d = document.createElement('div');
   d.className = 'float ' + cls;
   d.textContent = text;
@@ -219,7 +219,7 @@ function floatText(target, text, cls) {
 
 function burst(target, colors) {
   const scene = $('scene').getBoundingClientRect();
-  const r = $(target).querySelector('canvas').getBoundingClientRect();
+  const r = $(target).querySelector('canvas:not(.off)').getBoundingClientRect();
   for (let i = 0; i < 16; i++) {
     const d = document.createElement('div');
     d.className = 'particle';
@@ -242,10 +242,20 @@ async function banner(html, cls) {
   b.classList.add('hidden');
 }
 
+// 主角表情：hero（呆臉）、hero_atk（怒吼）、hero_hurt（嚇到）、hero_smug（得意）、hero_dead（X_X）
+const FACES = ['hero', 'hero_atk', 'hero_hurt', 'hero_smug', 'hero_dead'];
+let faceTimer = null;
 function placeHero() {
   const w = $('hero').querySelector('.sprite-wrap');
-  w.innerHTML = ''; w.appendChild(spriteEl('hero', pxScale()));
+  w.innerHTML = '';
+  FACES.forEach(f => { const c = spriteEl(f, pxScale()); c.dataset.face = f; w.appendChild(c); });
   $('hero').className = 'fighter';
+  setFace('hero');
+}
+function setFace(face, ms = 0) {
+  clearTimeout(faceTimer);
+  $('hero').querySelectorAll('canvas').forEach(c => c.classList.toggle('off', c.dataset.face !== face));
+  if (ms) faceTimer = setTimeout(() => setFace('hero'), ms / SPEEDS[speedIdx]);
 }
 
 // ---------------- 覆蓋層 ----------------
@@ -299,9 +309,7 @@ async function fight(enemy) {
   const foe = $('foe'), plate = $('foe-plate');
   const wrap = foe.querySelector('.sprite-wrap');
   wrap.innerHTML = '';
-  const cv = spriteEl(enemy.sprite, pxScale());
-  if (enemy.hue) cv.style.filter = `hue-rotate(${enemy.hue}deg)`;
-  wrap.appendChild(cv);
+  wrap.appendChild(spriteEl(enemy.sprite, pxScale()));
   foe.className = 'fighter enter' + (enemy.boss ? ' boss' : '') + (enemy.elite ? ' elite' : '') +
     (['bat', 'ghost'].includes(enemy.sprite) ? ' flying' : '');
   plate.className = 'plate' + (enemy.boss ? ' boss' : enemy.elite ? ' elite' : '');
@@ -309,7 +317,10 @@ async function fight(enemy) {
   $('foe-tag').textContent = enemy.tag;
   $('camp').classList.add('hidden');
 
-  if (enemy.boss) { sfx.boss(); await banner(`首領出現！<small>${enemy.name}</small>`, 'boss'); }
+  if (enemy.boss) {
+    sfx.boss(); setFace('hero_hurt', 1600);
+    await banner(`神獸降臨！<small>${enemy.name}・血量過半會覺醒變形</small>`, 'boss');
+  }
   else log(`${enemy.name} 擋住了去路！`, 'c-sys');
 
   const gen = battle(P, enemy);
@@ -322,6 +333,7 @@ async function fight(enemy) {
 
       case 'hit':
         if (ev.who === 'player') {
+          setFace('hero_atk', 380);
           retrigger($('hero'), 'lunge-r'); await wait(120);
           retrigger(foe, 'hurt');
           floatText('foe', ev.dmg, ev.crit ? 'crit' : '');
@@ -332,38 +344,38 @@ async function fight(enemy) {
         } else {
           foe.classList.remove('charging');
           retrigger(foe, 'lunge-l'); await wait(120);
-          retrigger($('hero'), 'hurt');
+          retrigger($('hero'), 'hurt'); setFace('hero_hurt', 450);
           floatText('hero', ev.dmg, ev.smash ? 'smash' : 'foe-dmg');
           sfx.hurt(); if (ev.smash || ev.crit) shake(ev.smash);
-          log(`${enemy.name}${ev.smash ? '使出重擊' : ev.crit ? '爆擊' : '攻擊'}，造成 ${ev.dmg} 傷害`, 'c-bad');
+          log(`${ev.extra ? '連擊！' : ''}${enemy.name}${ev.smash ? `使出「${ev.skill}」` : ev.crit ? '爆擊' : '攻擊'}，造成 ${ev.dmg} 傷害`, 'c-bad');
           if (ev.heal) { floatText('foe', '+' + ev.heal, 'heal'); log(`${enemy.name} 吸取了 ${ev.heal} 生命`, 'c-bad'); }
-          if (ev.poisoned) log('你中毒了！（3 回合）', 'c-poison');
+          if (ev.poisoned) log(ev.burn ? '你被灼燒了！（3 回合）' : '你中毒了！（3 回合）', 'c-poison');
         }
         break;
 
       case 'miss':
         sfx.miss();
         if (ev.who === 'player') { retrigger($('hero'), 'lunge-r'); retrigger(foe, 'dodge-r'); floatText('foe', 'MISS', 'miss'); log(`${enemy.name} 閃過了攻擊`); }
-        else { retrigger(foe, 'lunge-l'); retrigger($('hero'), 'dodge-l'); floatText('hero', 'MISS', 'miss'); log('你閃避了攻擊！', 'c-good'); }
+        else { retrigger(foe, 'lunge-l'); retrigger($('hero'), 'dodge-l'); setFace('hero_smug', 700); floatText('hero', 'MISS', 'miss'); log('你閃避了攻擊！', 'c-good'); }
         break;
 
       case 'poison': floatText('hero', ev.dmg, 'poison'); log(`毒性發作，損失 ${ev.dmg} 生命`, 'c-poison'); break;
       case 'thorn': retrigger(foe, 'hurt'); floatText('foe', ev.dmg, 'thorn'); log(`荊棘反彈 ${ev.dmg} 傷害`, 'c-good'); break;
       case 'regen': floatText('foe', '+' + ev.heal, 'heal'); log(`${enemy.name} 再生了 ${ev.heal} 生命`); break;
-      case 'enrage': foe.classList.add('enraged'); shake(true); sfx.boss(); log(`${enemy.name} 進入狂暴狀態！攻擊大幅提升`, 'c-bad'); break;
-      case 'charge': foe.classList.add('charging'); log(`${enemy.name} 正在蓄力……下一擊無法閃避！`, 'c-bad'); break;
-      case 'revive': retrigger($('hero'), 'revive'); sfx.heal(); burst('hero', ['#ffd23a', '#ff8a2a', '#fff3c4']); log('鳳凰羽燃燒！你從灰燼中復活', 'c-crit'); break;
+      case 'transform': await transform(enemy, ev); break;
+      case 'charge': foe.classList.add('charging'); log(`${enemy.name} 正在蓄力「${ev.skill}」……下一擊無法閃避！`, 'c-bad'); break;
+      case 'revive': setFace('hero'); retrigger($('hero'), 'revive'); sfx.heal(); burst('hero', ['#ffd23a', '#ff8a2a', '#fff3c4']); log('鳳凰羽燃燒！你從灰燼中復活', 'c-crit'); break;
 
       case 'win':
         result = 'win';
         run.kills++;
         burst('foe', ['#fff', '#ffd23a', '#ff8a2a', '#c66bff']);
-        foe.classList.add('die'); sfx.win();
+        foe.classList.add('die'); sfx.win(); setFace('hero_smug', 1200);
         log(`擊敗了 ${enemy.name}！`, 'c-good');
         break;
       case 'lose':
         result = 'lose';
-        $('hero').classList.add('fall'); sfx.lose();
+        setFace('hero_dead'); $('hero').classList.add('fall'); sfx.lose();
         log('你倒下了……', 'c-bad');
         break;
     }
@@ -378,6 +390,34 @@ async function fight(enemy) {
   return result;
 }
 
+// 首領覺醒變形：閃光 → 換外型 → 名牌更新
+async function transform(enemy, ev) {
+  const foe = $('foe'), wrap = foe.querySelector('.sprite-wrap');
+  foe.classList.remove('charging');
+  log(`${BOSSES[enemy.key].name} 的力量正在暴走……`, 'c-bad');
+  foe.classList.add('morphing'); sfx.boss(); shake(true);
+  setFace('hero_hurt', 2200);
+  await wait(700);
+  wrap.innerHTML = '';
+  wrap.appendChild(spriteEl(enemy.sprite, pxScale()));
+  burst('foe', ['#fff', '#ffd23a', '#ff4ae0', '#5ad6ff']);
+  foe.classList.remove('morphing'); foe.classList.add('awake'); retrigger(foe, 'morphed');
+  $('foe-name').textContent = enemy.name;
+  $('foe-tag').textContent = enemy.tag;
+  if (ev.heal > 0) floatText('foe', '+' + ev.heal, 'heal');
+  sfx.crit();
+  await banner(`覺醒變形！<small>${enemy.name}・${ev.power}</small>`, 'boss');
+  log(`${enemy.name} 覺醒了！${ev.power}`, 'c-bad');
+}
+
+// 首領用「抽袋」決定：十隻神獸都出現過一輪才會重複
+function nextBoss() {
+  if (!run.bossBag || !run.bossBag.length) {
+    run.bossBag = Object.keys(BOSSES).sort(() => Math.random() - .5);
+  }
+  return run.bossBag.pop();
+}
+
 // ---------------- 主流程 ----------------
 async function playRun() {
   P = createPlayer();
@@ -387,7 +427,7 @@ async function playRun() {
   placeHero();
   bg.setFloor(1);
   renderStats(); renderHero(); renderTrack();
-  log('布丁小雞踏入了無限地城……', 'c-sys');
+  log('呆呆小雞踏入了無限地城……', 'c-sys');
 
   while (true) {
     renderTrack();
@@ -415,7 +455,7 @@ async function playRun() {
 
     $('foe').classList.remove('hidden');
     $('foe-plate').classList.remove('hidden');
-    const enemy = createEnemy(run.floor, run.node);
+    const enemy = createEnemy(run.floor, run.node, FLOOR_NODES[run.node] === 'boss' ? nextBoss() : undefined);
     const result = await fight(enemy);
     if (result === 'lose') return gameOver();
 
@@ -442,7 +482,7 @@ function gameOver() {
   if (isNew) store.set('best', run.floor);
   showModal(`
     <h2>冒險結束</h2>
-    <p class="sub">布丁小雞在第 ${run.floor} 層倒下了</p>
+    <p class="sub">呆呆小雞在第 ${run.floor} 層倒下了</p>
     <div class="summary">
       <div>抵達樓層<b class="${isNew ? 'new' : ''}">${run.floor}F${isNew ? ' NEW!' : ''}</b></div>
       <div>最佳紀錄<b>${Math.max(best, run.floor)}F</b></div>
@@ -463,13 +503,15 @@ function titleScreen() {
     <div class="how">
       每層有 <b>2 場戰鬥 → 營火 → 首領</b>。<br>
       戰鬥自動進行，勝利後從 3 張卡中挑 1 張強化。<br>
-      首領血量過半會<b>狂暴</b>，每 4 回合施放<b>無法閃避的重擊</b>。<br>
+      首領是隨機的<b>神獸</b>，血量過半會<b>覺醒變形</b>並獲得新能力，還會定期蓄力施放<b>無法閃避的絕招</b>。<br>
       快捷鍵：<b>1 / 2 / 3</b> 選卡、<b>S</b> 切換速度、<b>M</b> 音效
     </div>
     ${best ? `<div class="best">最佳紀錄 <b>${best}F</b></div>` : ''}
     <button id="btn-start" class="px-btn primary">開始冒險</button>`);
   const art = $('modal').querySelector('.title-art');
-  art.append(spriteEl('hero', 4), spriteEl('slime', 3), spriteEl('boss', 4));
+  const keys = Object.keys(BOSSES);
+  const pickB = keys[Math.floor(Math.random() * keys.length)];
+  art.append(spriteEl('hero', 4), spriteEl('boss_' + pickB, 3), spriteEl('boss_' + pickB + '_2', 3));
   $('btn-start').onclick = () => { hideModal(); playRun(); };
   $('btn-start').focus();
 }

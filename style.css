@@ -158,7 +158,12 @@ canvas, .icon { image-rendering: pixelated; image-rendering: crisp-edges; }
 .fighter.poisoned canvas { filter: sepia(1) hue-rotate(70deg) saturate(3); }
 .fighter.revive canvas { animation: revive 1s steps(6); }
 @keyframes revive { 0%,50% { filter: brightness(3) sepia(1); } }
-#foe.enraged canvas { filter: saturate(1.6) drop-shadow(0 0 0 #f00) drop-shadow(2px 0 0 #ff2a2a) drop-shadow(-2px 0 0 #ff2a2a) drop-shadow(0 2px 0 #ff2a2a) drop-shadow(0 -2px 0 #ff2a2a); }
+canvas.off { display: none; }
+#foe.morphing canvas { animation: morph .7s steps(7) forwards; }
+@keyframes morph { 0% { filter: none; } 30% { filter: brightness(4) saturate(0); transform: scale(1.1, .9); } 60% { filter: brightness(6) saturate(0); transform: scale(.85, 1.15); } 100% { filter: brightness(10) saturate(0); transform: scale(1.2); opacity: .2; } }
+#foe.morphed canvas { animation: morphed .6s steps(6); }
+@keyframes morphed { from { transform: scale(1.4); filter: brightness(3); } }
+#foe.awake .sprite-wrap { animation-duration: .9s; }
 #foe.charging canvas { animation: charge .25s steps(2) infinite; }
 @keyframes charge { 50% { filter: brightness(1.8) drop-shadow(0 0 0 #fff) drop-shadow(2px 0 0 #ffd23a) drop-shadow(-2px 0 0 #ffd23a); } }
 #foe.elite canvas { filter: drop-shadow(2px 0 0 var(--gold)) drop-shadow(-2px 0 0 var(--gold)) drop-shadow(0 2px 0 var(--gold)) drop-shadow(0 -2px 0 var(--gold)); }
